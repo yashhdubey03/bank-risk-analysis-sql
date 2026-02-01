@@ -1,0 +1,85 @@
+-- =====================================================
+-- Banking Transaction & Risk Analysis
+-- Core SQL Queries
+-- =====================================================
+
+-- 1. Weekly Transaction Volume
+SELECT 
+    (transaction_step / 168) + 1 AS week,
+    COUNT(*) AS total_transactions
+FROM transactions
+GROUP BY week
+ORDER BY week;
+
+
+-- 2. Balance Drop Analysis by Transaction Type
+SELECT 
+    transaction_type,
+    COUNT(*) AS txn_count,
+    ROUND(AVG(sender_old_balance - sender_new_balance), 2) AS avg_balance_drop,
+    ROUND(MAX(sender_old_balance - sender_new_balance), 2) AS max_balance_drop
+FROM transactions
+GROUP BY transaction_type
+ORDER BY avg_balance_drop DESC;
+
+
+-- 3. Initial Risk Classification
+SELECT 
+    CASE
+        WHEN amount > 1000000 
+             AND transaction_type IN ('TRANSFER', 'CASH_OUT')
+            THEN 'High Risk'
+        WHEN amount > 1000000 
+             OR transaction_type IN ('TRANSFER', 'CASH_OUT')
+            THEN 'Medium Risk'
+        ELSE 'Low Risk'
+    END AS risk_category,
+    COUNT(*) AS transaction_count
+FROM transactions
+GROUP BY risk_category;
+
+
+-- 4. Enhanced Risk Classification (With Balance Drop Intensity)
+SELECT 
+    CASE
+        WHEN amount > 1000000
+             AND transaction_type IN ('TRANSFER', 'CASH_OUT')
+             AND sender_old_balance > 0
+             AND (sender_old_balance - sender_new_balance) / sender_old_balance > 0.8
+            THEN 'High Risk'
+        WHEN amount > 1000000
+             OR transaction_type IN ('TRANSFER', 'CASH_OUT')
+            THEN 'Medium Risk'
+        ELSE 'Low Risk'
+    END AS enhanced_risk_category,
+    COUNT(*) AS transaction_count
+FROM transactions
+GROUP BY enhanced_risk_category;
+
+
+-- 5. Top High-Risk Customers
+WITH enhanced_risk AS (
+    SELECT 
+        sender_id,
+        amount,
+        CASE
+            WHEN amount > 1000000
+                 AND transaction_type IN ('TRANSFER', 'CASH_OUT')
+                 AND sender_old_balance > 0
+                 AND (sender_old_balance - sender_new_balance) / sender_old_balance > 0.8
+                THEN 'High Risk'
+            ELSE 'Other'
+        END AS risk_flag
+    FROM transactions
+)
+
+SELECT 
+    sender_id,
+    COUNT(*) AS total_transactions,
+    SUM(CASE WHEN risk_flag = 'High Risk' THEN 1 ELSE 0 END) AS high_risk_txn_count,
+    ROUND(SUM(CASE WHEN risk_flag = 'High Risk' THEN amount ELSE 0 END), 2) AS total_high_risk_amount
+FROM enhanced_risk
+GROUP BY sender_id
+HAVING high_risk_txn_count > 0
+ORDER BY total_high_risk_amount DESC
+LIMIT 10;

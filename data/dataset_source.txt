@@ -1,0 +1,5 @@
+Dataset: PaySim Mobile Money Transactions
+Source: Kaggle
+Total Records: 6,362,620
+Note: Dataset not included due to GitHub file size limitations.
+Please download from Kaggle: https://www.kaggle.com/datasets/mtalaltariq/paysim-data/data
